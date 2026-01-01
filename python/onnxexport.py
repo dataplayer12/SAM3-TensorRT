@@ -47,9 +47,9 @@ class Sam3ONNXWrapper(torch.nn.Module):
 wrapper = Sam3ONNXWrapper(model, input_ids, attention_mask).to(device).eval()
 
 # 5. Export to ONNX
-output_dir = Path(f"onnx_weights_{prompt}")
+output_dir = Path(f"onnx_weights")
 output_dir.mkdir(exist_ok=True)
-onnx_path = str(output_dir / f"sam3_{prompt}.onnx")
+onnx_path = str(output_dir / f"sam3_static.onnx")
 
 torch.onnx.export(
     wrapper,
