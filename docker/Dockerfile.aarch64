@@ -1,11 +1,11 @@
-FROM nvcr.io/nvidia/pytorch:25.11-py3
+FROM dustynv/pytorch:2.7-r36.4.0
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN python3 -m pip install --upgrade pip --index-url https://pypi.org/simple && \
     python3 -m pip install --no-cache-dir transformers==5.0.0rc1 accelerate --index-url https://pypi.org/simple
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cmake pkg-config libopencv-dev \
+    build-essential cmake pkg-config libopencv-dev libsndfile1 \
   && rm -rf /var/lib/apt/lists/*
 
 ENV LD_LIBRARY_PATH=/opt/hpcx/ucx/lib:/opt/hpcx/ucc/lib:${LD_LIBRARY_PATH}
