@@ -1,6 +1,16 @@
-# SAM3 to TensorRT
+# SAM3 → TensorRT
 
 Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT engine for real-time segmentation. This repo now includes a C++/CUDA inference library and demo apps for both semantic and instance segmentation.
+
+## Table of Contents
+- [Project Overview](#project-overview)
+- [Demos](#demos)
+- [Repo Layout](#repo-layout)
+- [Quickstart](#quickstart)
+- [Jetson / DGX Spark](#jetson--dgx-spark)
+- [Extensions](#extensions)
+- [Troubleshooting](#troubleshooting)
+- [Miscellaneous](#miscellaneous)
 
 ## Project Overview
 - Python tooling to export SAM3 to a clean ONNX graph.
@@ -9,6 +19,13 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 - Zero-copy support on unified-memory platforms (Jetson, DGX Spark).
 - Everything runs inside a reproducible docker environment (x86; see Jetson section for aarch64).
 - Semantic and instance segmentation outputs demonstrated in `demo/`.
+
+## Demos
+Semantic and instance segmentation produced by the C++ demo app:
+
+<img src="demo/semantic_puppies.png" width="640" alt="Semantic segmentation demo">
+
+<img src="demo/instance_box.jpeg" width="640" alt="Instance segmentation demo">
 
 ## Repo Layout
 - `python/` - ONNX export and visualization scripts.
@@ -89,13 +106,6 @@ docker run -it --rm --network=host --runtime=nvidia \
   --env HF_TOKEN -v "$PWD":/workspace -w /workspace sam3-trt-aarch64 bash
 ```
 Note: `docker/Dockerfile.aarch64` is expected to mirror the x86 Dockerfile with a compatible base image and deps.
-
-## Demos
-Semantic and instance segmentation produced by the C++ demo app:
-
-<img src="demo/semantic_puppies.png" width="640" alt="Semantic segmentation demo">
-
-<img src="demo/instance_box.jpeg" width="640" alt="Instance segmentation demo">
 
 ## Extensions
 Ideas to extend this project:
