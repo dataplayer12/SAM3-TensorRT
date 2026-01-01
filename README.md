@@ -137,3 +137,5 @@ This is a very raw project and provides the crucial backend TensorRT/CUDA bits n
 
 ### License
 - MIT (see `LICENSE`).
+
+If this saved you time, drop a ⭐ so others can find it and ship SAM-3 faster.
