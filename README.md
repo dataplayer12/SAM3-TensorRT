@@ -93,9 +93,9 @@ Note: `docker/Dockerfile.aarch64` is expected to mirror the x86 Dockerfile with 
 ## Demos
 Semantic and instance segmentation produced by the C++ demo app:
 
-| Semantic segmentation | Instance segmentation |
-| --- | --- |
-| <img src="demo/semantic_puppies.png" width="420" alt="Semantic segmentation demo"> | <img src="demo/instance_box.jpeg" width="420" alt="Instance segmentation demo"> |
+<img src="demo/semantic_puppies.png" width="640" alt="Semantic segmentation demo">
+
+<img src="demo/instance_box.jpeg" width="640" alt="Instance segmentation demo">
 
 ## Extensions
 Ideas to extend this project:
