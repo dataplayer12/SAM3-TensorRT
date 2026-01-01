@@ -1,22 +1,22 @@
 # SAM3 → TensorRT
 
-Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT engine for real-time segmentation. This repo now includes a C++/CUDA inference library and demo apps for both semantic and instance segmentation.
+Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT engine for real-time segmentation. This repo includes a CUDA inference library and demo apps for semantic and instance segmentation.
 
 ## Table of Contents
 - [Project Overview](#project-overview)
 - [Demos](#demos)
 - [Repo Layout](#repo-layout)
 - [Quickstart](#quickstart)
-- [Jetson / DGX Spark](#jetson--dgx-spark)
 - [Extensions](#extensions)
 - [Troubleshooting](#troubleshooting)
-- [Miscellaneous](#miscellaneous)
+- [Development guide](#development-guide)
 
 ## Project Overview
 - Python tooling to export SAM3 to a clean ONNX graph.
 - TensorRT-ready workflows for building optimized engines.
 - A C++/CUDA library for high-performance inference with demo apps.
-- Zero-copy support on unified-memory platforms (Jetson, DGX Spark).
+- Support for Promptable concept segmentation (PCS), the latest feautre in SAM3.
+- Zero-copy support on unified-memory platforms (Jetson, DGX Spark). Great for robotics/real-time interaction.
 - Everything runs inside a reproducible docker environment (x86; see Jetson section for aarch64).
 - Semantic and instance segmentation outputs demonstrated in `demo/`.
 
@@ -39,7 +39,15 @@ Instance segmentation results
 - `demo/` - Example outputs from the C++ demo app.
 
 ## Quickstart
-1) Build and start the Docker container (x86, all commands below run inside it)
+
+1) Request access to the gated model
+   - Visit https://huggingface.co/facebook/sam3 and request access.
+   - Ensure your `HF_TOKEN` has permission.
+   - Set `HF_TOKEN` as environment variable in the host. Docker will pick it up from there.
+
+2) Build and start the Docker container for your platform (all commands below run inside it)
+
+### On x86
 ```bash
 docker build -t sam3-trt -f docker/Dockerfile.x86 .
 docker run -it --rm \
@@ -55,54 +63,9 @@ docker run -it --rm \
   sam3-trt bash
 ```
 
-2) Request access to the gated model
-   - Visit https://huggingface.co/facebook/sam3 and request access.
-   - Ensure your `HF_TOKEN` has permission.
+### On Jetson/Spark
 
-3) Install Python dependencies for export
-```bash
-pip install torch transformers pillow requests
-```
-If SAM3 is missing from your installed `transformers`, install from source:
-```bash
-git clone https://github.com/huggingface/transformers.git
-cd transformers
-pip install '.[torch]'
-```
-
-4) Export to ONNX
-```bash
-export HF_TOKEN=<YOUR TOKEN>
-python python/onnxexport.py
-```
-This produces `onnx_weights/sam3_static.onnx` plus external weight shards.
-
-5) Build a TensorRT engine
-```bash
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose
-```
-Other precisions:
-```bash
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_int8.plan --int8 --verbose
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp8.plan --fp8 --verbose
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_int4.plan --int4 --verbose
-```
-
-6) Build the C++/CUDA apps
-```bash
-cmake -S cpp -B build
-cmake --build build -j
-```
-Dependencies: CUDA, TensorRT, and OpenCV (via pkg-config).
-
-7) Run the demo app
-```bash
-./build/sam3_pcs_app <image_dir> <engine_path.engine>
-```
-Results are written to a `results/` folder.
-
-## Jetson / DGX Spark
-For aarch64 platforms with shared CPU/GPU memory, the C++/CUDA library supports zero-copy inference paths.
+For aarch64 platforms with shared CPU/GPU memory, the C++ library in this repo supports zero-copy inference paths.
 
 Build and run the aarch64 container:
 ```bash
@@ -110,13 +73,39 @@ docker build -t sam3-trt-aarch64 -f docker/Dockerfile.aarch64 .
 docker run -it --rm --network=host --runtime=nvidia \
   --env HF_TOKEN -v "$PWD":/workspace -w /workspace sam3-trt-aarch64 bash
 ```
-Note: `docker/Dockerfile.aarch64` is expected to mirror the x86 Dockerfile with a compatible base image and deps.
+
+3) Export to ONNX
+```bash
+export HF_TOKEN=<YOUR TOKEN>
+python python/onnxexport.py
+```
+This produces `onnx_weights/sam3_static.onnx` plus external weight shards.
+
+4) Build a TensorRT engine
+```bash
+trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose
+```
+
+5) Build the C++/CUDA apps
+```bash
+mkdir cpp/build && cd cpp/build
+cmake ..
+make
+```
+
+7) Run the demo app
+```bash
+./sam3_pcs_app <image_dir> <engine_path.engine>
+```
+
+Results are written to a `results/` folder.
+
 
 ## Extensions
-Ideas to extend this project:
+This is a very raw project and provides the crucial backend TensorRT/CUDA bits necessary for anything. From here, please feel free to fan out into any application you like. Pull requests are very welcome! Here are some ideas I can think of:
 - ROS2 wrapper for real-time robotics pipelines.
-- Interactive voice-based segmentation app (speech prompt to mask).
-- Web or GUI viewer for live camera input and overlays.
+- Interactive voice-based segmentation app. Have someone speak into a microphone, use a TTS model to transcribe it and feed into the engine, which then produces the segmentation mask live. I don't have the time to build it but I hope you can.
+- Live camera input and overlays. You will need a beefy GPU. SAM3 doesn't run realtime on a Jetson nano.
 
 ## Troubleshooting
 - **Access errors:** Make sure your `HF_TOKEN` has access to `facebook/sam3`.
@@ -124,20 +113,16 @@ Ideas to extend this project:
 - **TensorRT parse errors:** Ensure the full `onnx_weights/` directory is copied (external data is required).
 - **C++ build errors:** Confirm CUDA, TensorRT, and OpenCV are installed and discoverable via `pkg-config`.
 
-## Miscellaneous
-### Highlights
-- Minimal Python export that produces a clean ONNX graph.
-- TensorRT-focused inference pipeline.
-- C++/CUDA library designed for production-style throughput.
-- Zero-copy inference on unified-memory platforms (Jetson, DGX Spark).
+## Development guide
 
-### C++/CUDA Library Notes
+### CUDA Library Notes
 - The shared library target is `sam3_trt`.
 - Demo app: `sam3_pcs_app` (semantic/instance visualization modes).
+- Outputs include semantic segmentation and instance segmentation mask logits. If you choose `SAM3_VISUALIZATION::VIS_NONE` in your application, you need to apply sigmoid yourself.
+- The library does not support building engines. Use `trtexec` instead.
 
 ### ONNX Export Details
 - Default export runs on CPU for compatibility (switch `device` to `cuda` if desired).
-- Outputs include instance masks (`pred_masks`) and semantic mask logits.
 - SAM3 is large and exports with external weight shards; keep the entire `onnx_weights/` directory together.
 
 ### TensorRT Notes
