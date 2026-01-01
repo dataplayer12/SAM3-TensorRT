@@ -21,11 +21,15 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 - Semantic and instance segmentation outputs demonstrated in `demo/`.
 
 ## Demos
+Video demo (click to play):
+[![Semantic segmentation demo video](https://img.youtube.com/vi/hHvhQ514Evs/maxresdefault.jpg)](https://youtube.com/shorts/hHvhQ514Evs?feature=share)
+
 Semantic segmentation produced by the C++ demo app:
 
 <img src="demo/semantic_puppies.png" width="640" alt="Semantic segmentation demo">
 
 Instance segmentation results
+
 <img src="demo/instance_box.jpeg" width="800" alt="Instance segmentation demo">
 
 ## Repo Layout
