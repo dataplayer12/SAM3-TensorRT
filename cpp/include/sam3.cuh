@@ -63,7 +63,9 @@ private:
     uint8_t* zc_input; // used only if iGPU
 
     uint8_t* input_ptr; // placeholder for dGPU/iGPU ptr to pass into kernel
-
+    float3* gpu_colpal;
+    void setup_color_palette();
+    
     void check_zero_copy();
     void allocate_io_buffers();
     void load_engine();

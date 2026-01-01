@@ -15,6 +15,7 @@ SAM3_PCS::SAM3_PCS(const std::string engine_path, const float vis_alpha, const f
     
     check_zero_copy(); // needed before allocating io buffers
     allocate_io_buffers();
+    setup_color_palette();
 
     bsize.x=16;
     bsize.y=16;
@@ -120,7 +121,7 @@ void SAM3_PCS::visualize_on_dGPU(const cv::Mat& input, cv::Mat& result, SAM3_VIS
                 _mask_channel_idx,
                 _overlay_alpha,
                 _probability_threshold,
-                colpal.data());
+                gpu_colpal);
         }
     }
 
@@ -339,6 +340,20 @@ void SAM3_PCS::allocate_io_buffers()
         }
 
     }
+}
+
+void SAM3_PCS::setup_color_palette()
+{
+    cuda_check(cudaMalloc(&gpu_colpal, colpal.size()*sizeof(float3)), 
+        " allocating color palette on GPU");
+        
+    cuda_check(cudaMemcpyAsync((void *)gpu_colpal, 
+            (void *)colpal.data(), 
+            colpal.size()*sizeof(float3), 
+            cudaMemcpyHostToDevice, 
+            sam3_stream), " async memcpy for color pallete");
+    
+    cudaStreamSynchronize(sam3_stream);
 }
 
 SAM3_PCS::~SAM3_PCS()
