@@ -51,11 +51,26 @@ Instance segmentation results (`prompt='box'`)
    - Ensure your `HF_TOKEN` has permission.
    - Set `HF_TOKEN` as environment variable in the host. Docker will pick it up from there.
 
-2) Build and start the Docker container for your platform (all commands below run inside it)
+2) Build the Docker container for your platform (all commands below run inside it)
 
 ### On x86
 ```bash
 docker build -t sam3-trt -f docker/Dockerfile.x86 .
+```
+
+### On Jetson/Spark
+
+For aarch64 platforms with shared CPU/GPU memory, the C++ library in this repo supports zero-copy inference paths.
+
+Build and run the aarch64 container:
+```bash
+docker build -t sam3-trt-aarch64 -f docker/Dockerfile.aarch64 .
+```
+
+3) Export `HF_TOKEN` and run the docker container 
+
+```bash
+export HF_TOKEN=<YOUR TOKEN>
 docker run -it --rm \
   --network=host \
   --gpus all \
@@ -69,30 +84,18 @@ docker run -it --rm \
   sam3-trt bash
 ```
 
-### On Jetson/Spark
-
-For aarch64 platforms with shared CPU/GPU memory, the C++ library in this repo supports zero-copy inference paths.
-
-Build and run the aarch64 container:
+4) Export to ONNX
 ```bash
-docker build -t sam3-trt-aarch64 -f docker/Dockerfile.aarch64 .
-docker run -it --rm --network=host --runtime=nvidia \
-  --env HF_TOKEN -v "$PWD":/workspace -w /workspace sam3-trt-aarch64 bash
-```
-
-3) Export to ONNX
-```bash
-export HF_TOKEN=<YOUR TOKEN>
 python python/onnxexport.py
 ```
 This produces `onnx_weights/sam3_static.onnx` plus external weight shards.
 
-4) Build a TensorRT engine
+5) Build a TensorRT engine
 ```bash
 trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose
 ```
 
-5) Build the C++/CUDA apps
+6) Build the C++/CUDA library and sample app
 ```bash
 mkdir cpp/build && cd cpp/build
 cmake ..
