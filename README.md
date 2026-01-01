@@ -24,7 +24,7 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 - Support for Promptable concept segmentation (PCS), the latest feautre in SAM3.
 - Zero-copy support on unified-memory platforms (Jetson, DGX Spark). Great for robotics/real-time interaction.
 - Everything runs inside a reproducible docker environment (x86; see Jetson section for aarch64).
-- Semantic and instance segmentation outputs demonstrated in `demo/`.
+- MIT license for the love of everything nice :)
 
 ## Demos
 Video demo (click to play):
