@@ -15,26 +15,47 @@ SAM3_PCS::SAM3_PCS(const std::string engine_path, const float vis_alpha, const f
     
     check_zero_copy(); // needed before allocating io buffers
     allocate_io_buffers();
+    setup_color_palette();
 
     bsize.x=16;
     bsize.y=16;
 }
 
-void SAM3_PCS::pin_opencv_input_mat(cv::Mat& image)
+void SAM3_PCS::pin_opencv_matrices(cv::Mat& input_mat, cv::Mat& result_mat)
 {
-    opencv_inbytes = image.total() * image.elemSize();
+    opencv_inbytes = input_mat.total() * input_mat.elemSize();
+
     cuda_check(cudaHostRegister(
-            image.data,
+            input_mat.data,
             opencv_inbytes,
             cudaHostRegisterDefault),
-            " pinning opencv Mat on host"
+            " pinning opencv input Mat on host"
         );
     // for most purposes the default flag is good enough, in my benchmarking
     // using others say readonly flag did not improve performance
-    if (!is_zerocopy)
+
+    if (is_zerocopy)
     {
+        cuda_check(cudaHostRegister(
+            result_mat.data,
+            opencv_inbytes,
+            cudaHostRegisterDefault),
+            " pinning opencv result Mat on host"
+        );
+
+        cuda_check(cudaHostGetDevicePointer(
+            &zc_input, input_mat.data, 0),
+            " getting GPU pointer for input Mat");
+        
+        cuda_check(cudaHostGetDevicePointer(
+            &gpu_result, result_mat.data, 0),
+            " getting GPU pointer for result Mat");
+    }
+    else
+    {
+        // on dGPU allocate additional memory for input
         cuda_check(cudaMalloc(&opencv_input, opencv_inbytes), " allocating opencv input memory on a dGPU system");
-        cuda_check(cudaMalloc((void**)&gpu_result, opencv_inbytes), " allocating result memory on a dGPU system");
+        cuda_check(cudaMalloc((void**)&gpu_result, opencv_inbytes), " allocating result memory on a dGPU system");        
         cudaMemset(opencv_input, 0, opencv_inbytes);
         cudaMemset((void *)gpu_result, 0, opencv_inbytes);
     }
@@ -42,15 +63,24 @@ void SAM3_PCS::pin_opencv_input_mat(cv::Mat& image)
 
 void SAM3_PCS::visualize_on_dGPU(const cv::Mat& input, cv::Mat& result, SAM3_VISUALIZATION vis_type)
 {
+    if (is_zerocopy)
+    {
+        input_ptr = zc_input;
+    }
+    else
+    {
+        input_ptr = static_cast<uint8_t*>(opencv_input);
+    }
+
     if (vis_type == SAM3_VISUALIZATION::VIS_SEMANTIC_SEGMENTATION)
     {
         dim3 sbsize(16,16);
         dim3 sgsize;
-        sgsize.x = (input.cols + sbsize.x - 1) / (THREAD_COARSENING_FACTOR*sbsize.x);
-        sgsize.y = (input.rows + sbsize.y - 1) / (THREAD_COARSENING_FACTOR*sbsize.y);
-
+        sgsize.x = (input.cols + THREAD_COARSENING_FACTOR*sbsize.x - 1) / (THREAD_COARSENING_FACTOR*sbsize.x);
+        sgsize.y = (input.rows + THREAD_COARSENING_FACTOR*sbsize.y - 1) / (THREAD_COARSENING_FACTOR*sbsize.y);
+        
         draw_semantic_seg_mask<<<sgsize, sbsize, 0, sam3_stream>>>(
-            static_cast<uint8_t*>(opencv_input),
+            input_ptr,
             static_cast<float*>(output_gpu[1]),
             gpu_result,
             input.cols,
@@ -67,36 +97,40 @@ void SAM3_PCS::visualize_on_dGPU(const cv::Mat& input, cv::Mat& result, SAM3_VIS
         dim3 ibsize(8,8,8); // 3D block
         dim3 igsize;
 
-        igsize.x = (input.cols + ibsize.x - 1) / (THREAD_COARSENING_FACTOR*ibsize.x);
-        igsize.y = (input.rows + ibsize.y - 1) / (THREAD_COARSENING_FACTOR*ibsize.y);
+        igsize.x = (input.cols + THREAD_COARSENING_FACTOR*ibsize.x - 1) / (THREAD_COARSENING_FACTOR*ibsize.x);
+        igsize.y = (input.rows + THREAD_COARSENING_FACTOR*ibsize.y - 1) / (THREAD_COARSENING_FACTOR*ibsize.y);
         // 2D grid
 
-        cudaMemcpyAsync((void *)gpu_result, (void *)opencv_input, opencv_inbytes, cudaMemcpyDeviceToDevice, sam3_stream);
+        cuda_check(cudaMemcpyAsync((void *)gpu_result, 
+            (void *)input_ptr, 
+            opencv_inbytes, 
+            cudaMemcpyDeviceToDevice, 
+            sam3_stream), " async memcpy for result during instance seg visualization");
 
         for (int _mask_channel_idx=0; _mask_channel_idx<200; _mask_channel_idx+=ibsize.z)
         {
-        draw_instance_seg_mask<<<igsize, ibsize, 0, sam3_stream>>>(
-            static_cast<uint8_t*>(opencv_input),
-            static_cast<float*>(output_gpu[0]),
-            gpu_result,
-            input.cols,
-            input.rows,
-            input.channels(),
-            SAM3_OUTMASK_WIDTH,
-            SAM3_OUTMASK_HEIGHT,
-            _mask_channel_idx,
-            _overlay_alpha,
-            _probability_threshold,
-            colpal.data());
+            draw_instance_seg_mask<<<igsize, ibsize, 0, sam3_stream>>>(
+                input_ptr,
+                static_cast<float*>(output_gpu[0]),
+                gpu_result,
+                input.cols,
+                input.rows,
+                input.channels(),
+                SAM3_OUTMASK_WIDTH,
+                SAM3_OUTMASK_HEIGHT,
+                _mask_channel_idx,
+                _overlay_alpha,
+                _probability_threshold,
+                gpu_colpal);
         }
     }
 
-    if (vis_type == SAM3_VISUALIZATION::VIS_NONE)
+    if (!is_zerocopy && vis_type == SAM3_VISUALIZATION::VIS_NONE)
     {
         cudaMemcpyAsync(output_cpu[0], output_gpu[0],output_sizes[0], cudaMemcpyDeviceToHost, sam3_stream);
         cudaMemcpyAsync(output_cpu[1], output_gpu[1],output_sizes[1], cudaMemcpyDeviceToHost, sam3_stream);
     }
-    else
+    else if (!is_zerocopy)
     {
         cudaMemcpyAsync(
             (void*)result.data, 
@@ -105,6 +139,9 @@ void SAM3_PCS::visualize_on_dGPU(const cv::Mat& input, cv::Mat& result, SAM3_VIS
             cudaMemcpyDeviceToHost, 
             sam3_stream);
     }
+
+    // if is_zerocopy, there is no need to do any synchronization/copy
+    // to make the result visible to the CPU
 }
 
 bool SAM3_PCS::infer_on_dGPU(const cv::Mat& input, cv::Mat& result, SAM3_VISUALIZATION vis_type)
@@ -135,12 +172,8 @@ bool SAM3_PCS::infer_on_dGPU(const cv::Mat& input, cv::Mat& result, SAM3_VISUALI
 
 bool SAM3_PCS::infer_on_iGPU(const cv::Mat& input, cv::Mat& result, SAM3_VISUALIZATION vis_type)
 {
-    gsize.x = (in_width + bsize.x - 1) / bsize.x;
-    gsize.y = (in_height + bsize.y - 1) / bsize.y;
-
-    cuda_check(cudaHostGetDevicePointer(
-        &zc_input, input.data, 0),
-        " getting GPU pointer for input Mat");
+    gsize.x = (in_width + bsize.x - 1) / (THREAD_COARSENING_FACTOR*bsize.x);
+    gsize.y = (in_height + bsize.y - 1) / (THREAD_COARSENING_FACTOR*bsize.y);
 
     pre_process_sam3<<<gsize, bsize, 0, sam3_stream>>>(
         zc_input,
@@ -152,9 +185,10 @@ bool SAM3_PCS::infer_on_iGPU(const cv::Mat& input, cv::Mat& result, SAM3_VISUALI
         in_height);
     
     bool res = trt_ctx->enqueueV3(sam3_stream);
+    visualize_on_dGPU(input, result, vis_type);
     cudaStreamSynchronize(sam3_stream);
 
-    return true;
+    return res;
 }
 
 bool SAM3_PCS::infer_on_image(const cv::Mat& input, cv::Mat& result, SAM3_VISUALIZATION vis_type)
@@ -306,6 +340,20 @@ void SAM3_PCS::allocate_io_buffers()
         }
 
     }
+}
+
+void SAM3_PCS::setup_color_palette()
+{
+    cuda_check(cudaMalloc(&gpu_colpal, colpal.size()*sizeof(float3)), 
+        " allocating color palette on GPU");
+        
+    cuda_check(cudaMemcpyAsync((void *)gpu_colpal, 
+            (void *)colpal.data(), 
+            colpal.size()*sizeof(float3), 
+            cudaMemcpyHostToDevice, 
+            sam3_stream), " async memcpy for color pallete");
+    
+    cudaStreamSynchronize(sam3_stream);
 }
 
 SAM3_PCS::~SAM3_PCS()

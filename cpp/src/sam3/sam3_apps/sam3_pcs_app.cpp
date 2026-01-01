@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
 
     const float vis_alpha = 0.5;
     const float probability_threshold = 0.5;
-    const SAM3_VISUALIZATION visualize = SAM3_VISUALIZATION::VIS_SEMANTIC_SEGMENTATION;
+    const SAM3_VISUALIZATION visualize = SAM3_VISUALIZATION::VIS_INSTANCE_SEGMENTATION;
 
     SAM3_PCS pcs(epath, vis_alpha, probability_threshold);
 
@@ -85,8 +85,8 @@ int main(int argc, char* argv[])
                 cv::Mat tmp = cv::imread(fname.path(), cv::IMREAD_COLOR);
                 raw_bytes = (char *)malloc(tmp.total()*tmp.elemSize());
                 read_image_into_buffer(fname.path(), raw_bytes, img);
-                pcs.pin_opencv_input_mat(img);
                 result = cv::imread(fname.path(), cv::IMREAD_COLOR);
+                pcs.pin_opencv_matrices(img, result);
             }
             else
             {
