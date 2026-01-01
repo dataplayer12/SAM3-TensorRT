@@ -23,18 +23,18 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 - A C++/CUDA library for high-performance inference with demo apps.
 - Support for Promptable concept segmentation (PCS), the latest feautre in SAM3.
 - Zero-copy support on unified-memory platforms (Jetson, DGX Spark). Great for robotics/real-time interaction.
-- Everything runs inside a reproducible docker environment (x86; see Jetson section for aarch64).
+- Everything runs inside a reproducible docker environment (x86, Jetson, Spark).
 - MIT license for the love of everything nice :)
 
 ## Demos
 Video demo (click to play):
 [![Semantic segmentation demo video](https://img.youtube.com/vi/hHvhQ514Evs/maxresdefault.jpg)](https://youtube.com/shorts/hHvhQ514Evs?feature=share)
 
-Semantic segmentation produced by the C++ demo app:
+Semantic segmentation produced by the C++ demo app (`prompt='dog'`)
 
 <img src="demo/semantic_puppies.png" width="640" alt="Semantic segmentation demo">
 
-Instance segmentation results
+Instance segmentation results (`prompt='box'`)
 
 <img src="demo/instance_box.jpeg" width="800" alt="Instance segmentation demo">
 
