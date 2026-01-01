@@ -42,7 +42,7 @@ public:
     ~SAM3_PCS();
     bool infer_on_image(const cv::Mat& input, cv::Mat& result, SAM3_VISUALIZATION vis_type);
     bool run_blind_inference();
-    void pin_opencv_input_mat(cv::Mat& image);
+    void pin_opencv_matrices(cv::Mat& input_mat, cv::Mat& result_mat);
     std::vector<void*> output_cpu;
 
 private:
@@ -61,6 +61,8 @@ private:
     void* opencv_input; // used only if dGPU
     uint8_t* gpu_result; // used for both
     uint8_t* zc_input; // used only if iGPU
+
+    uint8_t* input_ptr; // placeholder for dGPU/iGPU ptr to pass into kernel
 
     void check_zero_copy();
     void allocate_io_buffers();
