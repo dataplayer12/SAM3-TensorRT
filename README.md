@@ -1,62 +1,133 @@
-# SAM3 → TensorRT
+# SAM3 to TensorRT
 
-Export Meta AI's newest Segment Anything 3 (SAM-3) model to ONNX and then build a TensorRT engine you can deploy for real-time segmentation.
+Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT engine for real-time segmentation. This repo now includes a C++/CUDA inference library and demo apps for both semantic and instance segmentation.
 
-## Why this repo
-- Minimal, readable export script using Hugging Face `transformers`' `Sam3Model` and `Sam3Processor`
-- Clean ONNX graph with instance masks (`pred_masks`) and semantic mask outputs
-- TensorRT-ready: plug the produced ONNX into `trtexec` or your own build pipeline
-- CPU-friendly export for maximum compatibility (flip `device` to use GPU if you prefer)
+## Project Overview
+- Python tooling to export SAM3 to a clean ONNX graph.
+- TensorRT-ready workflows for building optimized engines.
+- A C++/CUDA library for high-performance inference with demo apps.
+- Zero-copy support on unified-memory platforms (Jetson, DGX Spark).
+- Everything runs inside a reproducible docker environment (x86; see Jetson section for aarch64).
+- Semantic and instance segmentation outputs demonstrated in `demo/`.
+
+## Repo Layout
+- `python/` - ONNX export and visualization scripts.
+- `cpp/` - C++/CUDA library and apps (TensorRT inference).
+- `docker/` - Container setup (`Dockerfile.x86`, with an aarch64 variant expected).
+- `demo/` - Example outputs from the C++ demo app.
 
 ## Quickstart
-1) **Request access to the gated model**
-   - Visit https://huggingface.co/facebook/sam3 and click “Access repository” (approval is required before downloads succeed). Make sure your `HF_TOKEN` has that access.
+1) Build and start the Docker container (x86, all commands below run inside it)
+```bash
+docker build -t sam3-trt -f docker/Dockerfile.x86 .
+docker run -it --rm \
+  --network=host \
+  --gpus all \
+  --ipc=host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  --runtime=nvidia \
+  --env HF_TOKEN \
+  -v "$PWD":/workspace \
+  -w /workspace \
+  sam3-trt bash
+```
 
-2) **Install dependencies**
+2) Request access to the gated model
+   - Visit https://huggingface.co/facebook/sam3 and request access.
+   - Ensure your `HF_TOKEN` has permission.
+
+3) Install Python dependencies for export
 ```bash
 pip install torch transformers pillow requests
-
-# Optional: If after a pip install the ONNX export script complains that it cannot find SAM3, it's just because SAM-3 is very new and a formal release of `transformers` has not added support yet. In this case, please install `transformers` using git
-
+```
+If SAM3 is missing from your installed `transformers`, install from source:
+```bash
 git clone https://github.com/huggingface/transformers.git
 cd transformers
 pip install '.[torch]'
-# or uv pip install '.[torch]'
 ```
-Use a PyTorch wheel that matches your CUDA if you plan to export on GPU. By default a GPU is not required to export to ONNX.
 
-
-3) **Export to ONNX**
+4) Export to ONNX
 ```bash
 export HF_TOKEN=<YOUR TOKEN>
-python onnxexport.py
+python python/onnxexport.py
 ```
+This produces `onnx_weights/sam3_static.onnx` plus external weight shards.
 
-This downloads `facebook/sam3`, runs a sample prompt (`"ear"`), and writes `onnx_weights/sam3_static.onnx` plus associated weight shards. SAM-3 is ~3.2 GB, so the ONNX exporter will create external data files; if you build TensorRT on another machine you must copy the entire `onnx_weights/` directory (not just the .onnx).
-
-
-4) **Build a TensorRT engine**
-Use `trtexec` (or your favorite builder) on the generated ONNX:
-
+5) Build a TensorRT engine
 ```bash
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose # fp16
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_int8.plan --int8 --verbose # int8
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp8.plan --fp8 --verbose # fp8
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_int4.plan --int4 --verbose # int4
+trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose
+```
+Other precisions:
+```bash
+trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_int8.plan --int8 --verbose
+trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp8.plan --fp8 --verbose
+trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_int4.plan --int4 --verbose
 ```
 
+6) Build the C++/CUDA apps
+```bash
+cmake -S cpp -B build
+cmake --build build -j
+```
+Dependencies: CUDA, TensorRT, and OpenCV (via pkg-config).
 
-5) **Validate** (optional)
-- Run `onnxruntime` on `onnx_weights/sam3_static.onnx` to confirm outputs
-- Benchmark `sam3_fp16.plan` with `trtexec --loadEngine=sam3_fp16.plan`
+7) Run the demo app
+```bash
+./build/sam3_pcs_app <image_dir> <engine_path.engine>
+```
+Results are written to a `results/` folder.
 
-## Adapting the export
-- Change the prompt/image in `onnxexport.py` to better reflect your production use case.
-- Swap `device` to `"cuda"` for GPU-side export if your environment supports it.
-- Add more outputs from `Sam3Model` (e.g., scores) by extending `Sam3ONNXWrapper`.
+## Jetson / DGX Spark
+For aarch64 platforms with shared CPU/GPU memory, the C++/CUDA library supports zero-copy inference paths.
 
-## Project layout
-- `onnxexport.py` — single, documented script that pulls SAM-3, builds clean inputs, and exports ONNX
-- `LICENSE` — MIT
+Build and run the aarch64 container:
+```bash
+docker build -t sam3-trt-aarch64 -f docker/Dockerfile.aarch64 .
+docker run -it --rm --network=host --runtime=nvidia \
+  --env HF_TOKEN -v "$PWD":/workspace -w /workspace sam3-trt-aarch64 bash
+```
+Note: `docker/Dockerfile.aarch64` is expected to mirror the x86 Dockerfile with a compatible base image and deps.
 
-If this saved you time, drop a ⭐ so others can find it and ship SAM-3 faster.
+## Demos
+Semantic and instance segmentation produced by the C++ demo app:
+
+| Semantic segmentation | Instance segmentation |
+| --- | --- |
+| <img src="demo/semantic_puppies.png" width="420" alt="Semantic segmentation demo"> | <img src="demo/instance_box.jpeg" width="420" alt="Instance segmentation demo"> |
+
+## Extensions
+Ideas to extend this project:
+- ROS2 wrapper for real-time robotics pipelines.
+- Interactive voice-based segmentation app (speech prompt to mask).
+- Web or GUI viewer for live camera input and overlays.
+
+## Troubleshooting
+- **Access errors:** Make sure your `HF_TOKEN` has access to `facebook/sam3`.
+- **ONNX export fails:** Install `transformers` from source if SAM3 is missing.
+- **TensorRT parse errors:** Ensure the full `onnx_weights/` directory is copied (external data is required).
+- **C++ build errors:** Confirm CUDA, TensorRT, and OpenCV are installed and discoverable via `pkg-config`.
+
+## Miscellaneous
+### Highlights
+- Minimal Python export that produces a clean ONNX graph.
+- TensorRT-focused inference pipeline.
+- C++/CUDA library designed for production-style throughput.
+- Zero-copy inference on unified-memory platforms (Jetson, DGX Spark).
+
+### C++/CUDA Library Notes
+- The shared library target is `sam3_trt`.
+- Demo app: `sam3_pcs_app` (semantic/instance visualization modes).
+
+### ONNX Export Details
+- Default export runs on CPU for compatibility (switch `device` to `cuda` if desired).
+- Outputs include instance masks (`pred_masks`) and semantic mask logits.
+- SAM3 is large and exports with external weight shards; keep the entire `onnx_weights/` directory together.
+
+### TensorRT Notes
+- Use `trtexec` for quick engine builds and benchmarking.
+- FP16 is the usual starting point; INT8/FP8/INT4 require calibration or compatible tooling.
+
+### License
+- MIT (see `LICENSE`).
