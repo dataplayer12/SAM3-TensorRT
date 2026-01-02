@@ -36,9 +36,15 @@ void infer_one_image(SAM3_PCS& pcs,
     const cv::Mat& img, 
     cv::Mat& result, 
     const SAM3_VISUALIZATION vis,
-    const std::string outfile)
+    const std::string outfile,
+    bool benchmark_run)
 {
     bool success = pcs.infer_on_image(img, result, vis);
+
+    if (benchmark_run)
+    {
+        return;
+    }
 
     if (vis == SAM3_VISUALIZATION::VIS_NONE)
     {
@@ -55,14 +61,34 @@ int main(int argc, char* argv[])
 {
     if (argc < 3)
     {
-        std::cout << "Usage: ./sam3_pcs_app indir engine_path.engine" << std::endl;
+        std::cout << "Usage: ./sam3_pcs_app indir engine_path.engine <benchmark=false>" << std::endl;
         return 0;
     }
 
     const std::string in_dir = argv[1];
     std::string epath = argv[2];
+    bool benchmark=false; // in benchmarking mode we dont save output images
 
-    const float vis_alpha = 0.5;
+    if (argc==4)
+    {
+        std::string b_arg = argv[3]; // should be 0 or 1
+        try
+        {
+            benchmark = (b_arg == "1");
+        }
+        catch(const std::exception)
+        {
+            std::cout << "Unrecognized benchmark type " << argv[3] << std::endl;
+        }
+    }
+    std::cout << "Benchmarking: " << benchmark << std::endl;
+
+    auto start = std::chrono::system_clock::now();
+    auto end = std::chrono::system_clock::now();
+    std::chrono::duration<float> diff;
+    float millis_elapsed = 0.0; // int will overflow after ~650 hours
+
+    const float vis_alpha = 0.3;
     const float probability_threshold = 0.5;
     const SAM3_VISUALIZATION visualize = SAM3_VISUALIZATION::VIS_INSTANCE_SEGMENTATION;
 
@@ -92,8 +118,18 @@ int main(int argc, char* argv[])
             {
                 read_image_into_buffer(fname.path(), raw_bytes, img);
             }
-            infer_one_image(pcs, img, result, visualize, outfile);
+            start = std::chrono::system_clock::now();
+            infer_one_image(pcs, img, result, visualize, outfile, benchmark);
             num_images_read++;
+            end = std::chrono::system_clock::now();
+            diff = end - start;
+            millis_elapsed += (diff.count() * 1000);
+
+            if (num_images_read>0 && num_images_read%10==0)
+            {
+                float msec_per_image = millis_elapsed/num_images_read;
+                printf("Processed %d images at %f msec/image\n", num_images_read, msec_per_image);
+            }
         }
     }
 }
