@@ -5,6 +5,7 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 ## Table of Contents
 - [Project Overview](#project-overview)
 - [Demos](#demos)
+- [Benchmarks](#benchmarks)
 - [Repo Layout](#repo-layout)
 - [Quickstart](#quickstart)
   - [On x86](#on-x86)
@@ -13,6 +14,7 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 - [Troubleshooting](#troubleshooting)
 - [Development guide](#development-guide)
   - [CUDA Library Notes](#cuda-library-notes)
+  - [Benchmarking](#benchmarking)
   - [ONNX Export Details](#onnx-export-details)
   - [TensorRT Notes](#tensorrt-notes)
   - [License](#license)
@@ -37,6 +39,18 @@ Semantic segmentation produced by the C++ demo app (`prompt='dog'`)
 Instance segmentation results (`prompt='box'`)
 
 <img src="demo/instance_box.jpeg" width="800" alt="Instance segmentation demo">
+
+## Benchmarks
+Real-world speedups for various platforms using the Huggingface + PyTorch path v/s TensorRT+CUDA path from this project. The numbers show end to end image processing latency exclusing image load/save since that is disk i/o bound.
+
+| Hardware | HF+PyTorch | TensorRT+CUDA | Speedup | Notes |
+| --- | --- | --- | --- | --- |
+| RTX 3090 | 437.76 ms/image | 75.17 ms/image | 5.82x |  |
+| Jetson Orin NX | 6600 ms/image | 950 ms/image | 6.95x |  |
+| DGX Spark | TBD | TBD | TBD | TBD |
+| Jetson Nano | TBD | TBD | TBD | TBD |
+
+Please contribute your results and I will be happy to add them here. See [Benchmarking](#benchmarking).
 
 ## Repo Layout
 - `python/` - ONNX export and visualization scripts.
@@ -129,6 +143,19 @@ This is a very raw project and provides the crucial backend TensorRT/CUDA bits n
 - Demo app: `sam3_pcs_app` (semantic/instance visualization modes).
 - Outputs include semantic segmentation and instance segmentation mask logits. If you choose `SAM3_VISUALIZATION::VIS_NONE` in your application, you need to apply sigmoid yourself.
 - The library does not support building engines. Use `trtexec` instead.
+
+### Benchmarking
+Use the same image directory and prompt for all runs. Both paths time the model pipeline and exclude image load/save.
+
+Huggingface + PyTorch:
+```bash
+python python/basic_script.py <image_dir>
+```
+
+TensorRT + CUDA (benchmark mode disables output writes):
+```bash
+./sam3_pcs_app <image_dir> <engine_path.engine> 1
+```
 
 ### ONNX Export Details
 - Default export runs on CPU for compatibility (switch `device` to `cuda` if desired).
