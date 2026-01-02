@@ -29,12 +29,12 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 - MIT license for the love of everything nice :)
 
 ## Benchmarks
-Benchmarks from this project. The numbers show end to end image processing latency excluding image load/save time.
+The numbers show end to end image processing latency per image (4K resolution) in ms excluding image load/save time.
 
 | Hardware | HF+PyTorch | TensorRT+CUDA | Speedup | Notes |
 | --- | --- | --- | --- | --- |
-| RTX 3090 | 437.76 ms/image | 75.17 ms/image | 5.82x |  |
-| Jetson Orin NX | 6600 ms/image | 950 ms/image | 6.95x |  |
+| RTX 3090 | 438 ms | 75 ms | 5.82x |  |
+| Jetson Orin NX | 6600 ms | 950 ms | 6.95x |  |
 | DGX Spark | TBD | TBD | TBD | TBD |
 | Jetson Nano | TBD | TBD | TBD | TBD |
 
