@@ -4,8 +4,8 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 
 ## Table of Contents
 - [Project Overview](#project-overview)
-- [Demos](#demos)
 - [Benchmarks](#benchmarks)
+- [Demos](#demos)
 - [Repo Layout](#repo-layout)
 - [Quickstart](#quickstart)
   - [On x86](#on-x86)
@@ -28,6 +28,18 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
 - Everything runs inside a reproducible docker environment (x86, Jetson, Spark).
 - MIT license for the love of everything nice :)
 
+## Benchmarks
+Benchmarks from this project. The numbers show end to end image processing latency excluding image load/save time.
+
+| Hardware | HF+PyTorch | TensorRT+CUDA | Speedup | Notes |
+| --- | --- | --- | --- | --- |
+| RTX 3090 | 437.76 ms/image | 75.17 ms/image | 5.82x |  |
+| Jetson Orin NX | 6600 ms/image | 950 ms/image | 6.95x |  |
+| DGX Spark | TBD | TBD | TBD | TBD |
+| Jetson Nano | TBD | TBD | TBD | TBD |
+
+Please contribute your results and I will be happy to add them here. Use [Benchmarking](#benchmarking) to run the benchmarks yourself.
+
 ## Demos
 Video demo (click to play):
 [![Semantic segmentation demo video](https://img.youtube.com/vi/hHvhQ514Evs/maxresdefault.jpg)](https://youtube.com/shorts/hHvhQ514Evs?feature=share)
@@ -39,18 +51,6 @@ Semantic segmentation produced by the C++ demo app (`prompt='dog'`)
 Instance segmentation results (`prompt='box'`)
 
 <img src="demo/instance_box.jpeg" width="800" alt="Instance segmentation demo">
-
-## Benchmarks
-Benchmarks from this project. The numbers show end to end image processing latency excluding image load/save time.
-
-| Hardware | HF+PyTorch | TensorRT+CUDA | Speedup | Notes |
-| --- | --- | --- | --- | --- |
-| RTX 3090 | 437.76 ms/image | 75.17 ms/image | 5.82x |  |
-| Jetson Orin NX | 6600 ms/image | 950 ms/image | 6.95x |  |
-| DGX Spark | TBD | TBD | TBD | TBD |
-| Jetson Nano | TBD | TBD | TBD | TBD |
-
-Please contribute your results and I will be happy to add them here. See [Benchmarking](#benchmarking).
 
 ## Repo Layout
 - `python/` - ONNX export and visualization scripts.
