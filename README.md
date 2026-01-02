@@ -41,7 +41,7 @@ Instance segmentation results (`prompt='box'`)
 <img src="demo/instance_box.jpeg" width="800" alt="Instance segmentation demo">
 
 ## Benchmarks
-Real-world speedups for various platforms using the Huggingface + PyTorch path v/s TensorRT+CUDA path from this project. The numbers show end to end image processing latency exclusing image load/save since that is disk i/o bound.
+Benchmarks from this project. The numbers show end to end image processing latency excluding image load/save time.
 
 | Hardware | HF+PyTorch | TensorRT+CUDA | Speedup | Notes |
 | --- | --- | --- | --- | --- |
