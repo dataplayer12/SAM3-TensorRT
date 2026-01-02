@@ -12,6 +12,7 @@ def visualize_sam3_results(
     mask_alpha: float = 0.45,
     mask_threshold: float = 0.5,
     box_width: int = 3,
+    benchmark: bool = False,
 ) -> None:
     """
     Visualize SAM3 instance segmentation results and write to disk.
@@ -31,8 +32,10 @@ def visualize_sam3_results(
     img_rgba = image.convert("RGBA")
     W, H = img_rgba.size
 
-    scores_t = results["scores"]
-    boxes_t = results.get("boxes",[])
+    # in benchmarking mode we only visualize segmentation masks 
+    # to stay on par with the CUDA implementation
+    scores_t = [] if benchmark else results["scores"]
+    boxes_t = [] if benchmark else results.get("boxes",[])
     masks_obj = results["masks"]
 
     if isinstance(scores_t, torch.Tensor):
@@ -127,6 +130,9 @@ def visualize_sam3_results(
         bg = (0, 0, 0, 180)
         draw.rectangle([tx, ty, tx + tw + 2 * pad, ty + th + 2 * pad], fill=bg)
         draw.text((tx + pad, ty + pad), label, fill=(255, 255, 255, 255), font=font)
+
+    if benchmark:
+        return None # in benchmarking mode, we dont save output images
 
     # --- save ---
     # If saving as JPEG, must drop alpha
