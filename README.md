@@ -43,8 +43,11 @@ The numbers show end to end image processing latency per image (4K resolution) i
 | H100 | 213.2 ms | 24.9 ms | 8.56x | SXM5 variant |
 | GH200 | 142.3 ms | 23.3 ms | 6.11x | arm64+H100 iGPU, without zero-copy |
 | GH200 | 142.3 ms | 26.4 ms | 5.39x | using zero-copy |
+| B200 | 160.0 ms | 17.7 ms | 9.03x | SXM6 variant |
 
-Please contribute your results and I will be happy to add them here. Use [Benchmarking](#benchmarking) to run the benchmarks yourself.
+Note: the HF+PyTorch path is GPU-backed too, so these numbers compare two GPU implementations rather than CPU vs GPU.
+
+Please contribute your results and I will be happy to add them here. Use [this guide](#benchmarking) to run the benchmarks yourself.
 
 ## Demos
 Video demo (click to play):
