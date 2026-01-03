@@ -33,10 +33,16 @@ The numbers show end to end image processing latency per image (4K resolution) i
 
 | Hardware | HF+PyTorch | TensorRT+CUDA | Speedup | Notes |
 | --- | --- | --- | --- | --- |
+| Jetson Orin NX | 6600 ms | 950 ms | 6.95x | Uses zero-copy |
+| Jetson Thor |  |  |  | Please contribute |
+| DGX Spark |  |  |  | Please contribute |
 | RTX 3090 | 438 ms | 75 ms | 5.82x |  |
-| Jetson Orin NX | 6600 ms | 950 ms | 6.95x |  |
-| DGX Spark | TBD | TBD | TBD | TBD |
-| Jetson Nano | TBD | TBD | TBD | TBD |
+| A10 | 545.3 ms | 161.1 | 3.38x | GPU hits 100% utilization |
+| A100 | 314.1 ms | 48.8 ms | 6.43x | 40GB SXM4 variant |
+| H100 | 265.3 ms | 34.6 ms | 7.66x | PCIe variant |
+| H100 | 213.2 ms | 24.9 ms | 8.56x | SXM5 variant |
+| GH200 | 142.3 ms | 23.3 ms | 6.11x | arm64+H100 iGPU, without zero-copy |
+| GH200 | 142.3 ms | 26.4 ms | 5.39x | using zero-copy |
 
 Please contribute your results and I will be happy to add them here. Use [Benchmarking](#benchmarking) to run the benchmarks yourself.
 
