@@ -18,6 +18,7 @@ Export Meta AI's Segment Anything 3 (SAM3) model to ONNX, then build a TensorRT 
   - [ONNX Export Details](#onnx-export-details)
   - [TensorRT Notes](#tensorrt-notes)
   - [License](#license)
+- [Disclaimer](#disclaimer)
 
 ## Project Overview
 - Python tooling to export SAM3 to a clean ONNX graph.
@@ -178,3 +179,6 @@ TensorRT + CUDA (benchmark mode disables output writes):
 - MIT (see `LICENSE`).
 
 If this saved you time, drop a ⭐ so others can find it and ship SAM-3 faster.
+
+# Disclaimer
+All views expressed here are my own. This project is not affiliated with my employer.
