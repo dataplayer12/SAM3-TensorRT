@@ -2,7 +2,51 @@
 #include "sam3.cuh"
 #include <chrono>
 #include <thread>
+#include <memory>
 #include <opencv2/imgproc.hpp>
+
+void ensure_even_dimensions(const cv::Mat& input, cv::Mat& output)
+{
+    int new_width = input.cols;
+    int new_height = input.rows;
+    bool needs_resize = false;
+    
+    if (input.cols % 2 != 0)
+    {
+        new_width = input.cols + 1;
+        needs_resize = true;
+    }
+    
+    if (input.rows % 2 != 0)
+    {
+        new_height = input.rows + 1;
+        needs_resize = true;
+    }
+    
+    if (needs_resize)
+    {
+        cv::resize(input, output, cv::Size(new_width, new_height), 0, 0, cv::INTER_LINEAR);
+    }
+    else
+    {
+        output = input;
+    }
+}
+
+cv::Mat read_and_ensure_even(const std::string imgpath)
+{
+    cv::Mat img_original = cv::imread(imgpath, cv::IMREAD_COLOR);
+    if (img_original.empty())
+    {
+        std::stringstream err;
+        err << "Failed to read image: " << imgpath;
+        throw std::runtime_error(err.str());
+    }
+    
+    cv::Mat img;
+    ensure_even_dimensions(img_original, img);
+    return img;
+}
 
 void read_image_into_buffer(const std::string imgpath, char* raw_buffer, cv::Mat& buffer)
 {
@@ -94,11 +138,12 @@ int main(int argc, char* argv[])
 
     SAM3_PCS pcs(epath, vis_alpha, probability_threshold);
 
-    cv::Mat img, result;
-    char* raw_bytes;
-
     std::filesystem::create_directories("results");
     int num_images_read=0;
+    
+    cv::Mat pinned_img, pinned_result;
+    std::shared_ptr<void> img_mem_holder, result_mem_holder;
+    int last_rows = 0, last_cols = 0;
 
     for (const auto& fname : std::filesystem::directory_iterator(in_dir))
     {
@@ -106,38 +151,46 @@ int main(int argc, char* argv[])
         {
             std::filesystem::path outfile = std::filesystem::path("results") / fname.path().filename();
             
-            if (num_images_read==0)
+            try
             {
-                cv::Mat tmp = cv::imread(fname.path(), cv::IMREAD_COLOR);
-                raw_bytes = (char *)malloc(tmp.total()*tmp.elemSize());
-                read_image_into_buffer(fname.path(), raw_bytes, img);
-                result = cv::imread(fname.path(), cv::IMREAD_COLOR);
-                pcs.pin_opencv_matrices(img, result);
-            }
-            else
-            {
-                read_image_into_buffer(fname.path(), raw_bytes, img);
-            }
-            start = std::chrono::system_clock::now();
-            infer_one_image(pcs, img, result, visualize, outfile, benchmark);
-            num_images_read++;
-            end = std::chrono::system_clock::now();
-            diff = end - start;
-            millis_elapsed += (diff.count() * 1000);
+                cv::Mat img_loaded = read_and_ensure_even(fname.path());
+                
+                if (img_loaded.rows != last_rows || img_loaded.cols != last_cols || pinned_img.empty())
+                {
+                    auto [img_mat, img_holder] = pcs.allocate_pinned_mat(img_loaded.rows, img_loaded.cols, img_loaded.type());
+                    auto [result_mat, result_holder] = pcs.allocate_pinned_mat(img_loaded.rows, img_loaded.cols, img_loaded.type());
+                    
+                    pinned_img = img_mat;
+                    pinned_result = result_mat;
+                    img_mem_holder = img_holder;
+                    result_mem_holder = result_holder;
+                    
+                    last_rows = img_loaded.rows;
+                    last_cols = img_loaded.cols;
+                    
+                    pcs.setup_pinned_matrices(pinned_img, pinned_result);
+                }
+                
+                img_loaded.copyTo(pinned_img);
+                
+                start = std::chrono::system_clock::now();
+                infer_one_image(pcs, pinned_img, pinned_result, visualize, outfile, benchmark);
+                num_images_read++;
+                end = std::chrono::system_clock::now();
+                diff = end - start;
+                millis_elapsed += (diff.count() * 1000);
 
-            if (num_images_read>0 && num_images_read%10==0)
+                if (num_images_read>0 && num_images_read%10==0)
+                {
+                    float msec_per_image = millis_elapsed/num_images_read;
+                    printf("Processed %d images at %f msec/image\n", num_images_read, msec_per_image);
+                }
+            }
+            catch (const std::exception& e)
             {
-                float msec_per_image = millis_elapsed/num_images_read;
-                printf("Processed %d images at %f msec/image\n", num_images_read, msec_per_image);
+                std::cout << "Error processing " << fname.path() << ": " << e.what() << std::endl;
+                continue;
             }
         }
     }
-    
-    // Clean up allocated memory
-    if (raw_bytes != nullptr)
-    {
-        free(raw_bytes);
-    }
-    
-    return 0;
 }
