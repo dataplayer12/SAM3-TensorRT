@@ -148,7 +148,11 @@ __global__ void draw_instance_seg_mask(
             for (int iy=0; iy < THREAD_COARSENING_FACTOR; iy++)
             {
                 int res_loc_x = resX*THREAD_COARSENING_FACTOR + ix;
+                res_loc_x = min(res_loc_x, src_width-1);
+
                 int res_loc_y = resY*THREAD_COARSENING_FACTOR + iy;
+                res_loc_y = min(res_loc_y, src_height-1);
+                
                 int res_loc = (res_loc_y*src_width + res_loc_x)*src_channels;
 
                 int mask_loc_x = res_loc_x*mask_width/src_width;
