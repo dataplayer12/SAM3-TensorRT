@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
 
     const float vis_alpha = 0.3;
     const float probability_threshold = 0.5;
-    const SAM3_VISUALIZATION visualize = SAM3_VISUALIZATION::VIS_INSTANCE_SEGMENTATION;
+    const SAM3_VISUALIZATION visualize = SAM3_VISUALIZATION::VIS_SEMANTIC_SEGMENTATION;
 
     SAM3_PCS pcs(epath, vis_alpha, probability_threshold);
 
@@ -132,4 +132,12 @@ int main(int argc, char* argv[])
             }
         }
     }
+    
+    // Clean up allocated memory
+    if (raw_bytes != nullptr)
+    {
+        free(raw_bytes);
+    }
+    
+    return 0;
 }
