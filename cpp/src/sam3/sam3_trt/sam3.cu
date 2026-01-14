@@ -8,9 +8,6 @@ SAM3_PCS::SAM3_PCS(const std::string engine_path, const float vis_alpha, const f
     , gpu_result(nullptr)
     , zc_input(nullptr)
     , gpu_colpal(nullptr)
-    , registered_input_data(nullptr)
-    , registered_result_data(nullptr)
-    , opencv_matrices_registered(false)
     , opencv_inbytes(0)
 {
 
@@ -80,11 +77,6 @@ void SAM3_PCS::pin_opencv_matrices(cv::Mat& input_mat, cv::Mat& result_mat)
             cudaHostRegisterDefault),
             " pinning opencv input Mat on host"
         );
-    
-    // Track registered pointer for cleanup
-    registered_input_data = input_mat.data;
-    opencv_matrices_registered = true;
-    
     // for most purposes the default flag is good enough, in my benchmarking
     // using others say readonly flag did not improve performance
 
@@ -96,9 +88,6 @@ void SAM3_PCS::pin_opencv_matrices(cv::Mat& input_mat, cv::Mat& result_mat)
             cudaHostRegisterDefault),
             " pinning opencv result Mat on host"
         );
-        
-        // Track registered pointer for cleanup
-        registered_result_data = result_mat.data;
 
         cuda_check(cudaHostGetDevicePointer(
             &zc_input, input_mat.data, 0),
@@ -270,7 +259,7 @@ bool SAM3_PCS::infer_on_iGPU(const cv::Mat& input, cv::Mat& result, SAM3_VISUALI
     bool res = trt_ctx->enqueueV3(sam3_stream);
     visualize_on_dGPU(input, result, vis_type);
     cudaStreamSynchronize(sam3_stream);
-    
+
     return res;
 }
 
@@ -441,21 +430,6 @@ void SAM3_PCS::setup_color_palette()
 
 SAM3_PCS::~SAM3_PCS()
 {
-    // 1. Unregister pinned OpenCV matrices (if registered)
-    if (opencv_matrices_registered)
-    {
-        if (registered_input_data != nullptr)
-        {
-            cudaHostUnregister(registered_input_data);
-        }
-        
-        if (registered_result_data != nullptr)
-        {
-            cudaHostUnregister(registered_result_data);
-        }
-    }
-    
-    // 2. Free input_gpu buffers (allocated in allocate_io_buffers)
     for (auto& ptr : input_gpu)
     {
         if (ptr)
@@ -464,55 +438,11 @@ SAM3_PCS::~SAM3_PCS()
         }
     }
 
-    // 3. Free output_gpu buffers (allocated in allocate_io_buffers)
     for (auto& ptr : output_gpu)
     {
         if (ptr)
         {
             cudaFree(ptr);
         }
-    }
-    
-    // 4. Free input_cpu buffers (allocated with cudaHostAlloc)
-    for (auto& ptr : input_cpu)
-    {
-        if (ptr)
-        {
-            cudaFreeHost(ptr);
-        }
-    }
-    
-    // 5. Free output_cpu buffers (allocated with cudaHostAlloc)
-    for (auto& ptr : output_cpu)
-    {
-        if (ptr)
-        {
-            cudaFreeHost(ptr);
-        }
-    }
-    
-    // 6. Free opencv_input (only allocated in dGPU mode)
-    if (!is_zerocopy && opencv_input != nullptr)
-    {
-        cudaFree(opencv_input);
-    }
-    
-    // 7. Free gpu_result (only if allocated separately in dGPU mode)
-    // In zero-copy mode, gpu_result points to registered memory, not separately allocated
-    if (!is_zerocopy && gpu_result != nullptr)
-    {
-        cudaFree(gpu_result);
-    }
-    
-    // 8. Free color palette
-    if (gpu_colpal != nullptr)
-    {
-        cudaFree(gpu_colpal);
-    }
-    
-    // 9. Destroy CUDA stream
-    if (sam3_stream)
-    {
-        cudaStreamDestroy(sam3_stream);
     }
 }

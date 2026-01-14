@@ -75,11 +75,6 @@ private:
 
     uint8_t* input_ptr; // placeholder for dGPU/iGPU ptr to pass into kernel
     float3* gpu_colpal;
-    
-    // Track registered OpenCV matrices for cleanup
-    void* registered_input_data;
-    void* registered_result_data;
-    bool opencv_matrices_registered;
     void setup_color_palette();
     
     void check_zero_copy();

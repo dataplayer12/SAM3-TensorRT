@@ -169,21 +169,21 @@ int main(int argc, char* argv[])
                     last_cols = img_loaded.cols;
                     
                     pcs.setup_pinned_matrices(pinned_img, pinned_result);
-                }
+            }
                 
                 img_loaded.copyTo(pinned_img);
                 
-                start = std::chrono::system_clock::now();
+            start = std::chrono::system_clock::now();
                 infer_one_image(pcs, pinned_img, pinned_result, visualize, outfile, benchmark);
-                num_images_read++;
-                end = std::chrono::system_clock::now();
-                diff = end - start;
-                millis_elapsed += (diff.count() * 1000);
+            num_images_read++;
+            end = std::chrono::system_clock::now();
+            diff = end - start;
+            millis_elapsed += (diff.count() * 1000);
 
-                if (num_images_read>0 && num_images_read%10==0)
-                {
-                    float msec_per_image = millis_elapsed/num_images_read;
-                    printf("Processed %d images at %f msec/image\n", num_images_read, msec_per_image);
+            if (num_images_read>0 && num_images_read%10==0)
+            {
+                float msec_per_image = millis_elapsed/num_images_read;
+                printf("Processed %d images at %f msec/image\n", num_images_read, msec_per_image);
                 }
             }
             catch (const std::exception& e)
