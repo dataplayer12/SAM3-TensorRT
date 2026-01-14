@@ -3,10 +3,19 @@
 #include "sam3.hpp"
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include "cuda_runtime.h"
 #include "NvInfer.h"
 #include "NvInferRuntime.h"
 #include "prepost.cuh"
+
+struct PinnedMemoryDeleter {
+    void operator()(void* ptr) const {
+        if (ptr) {
+            cudaFreeHost(ptr);
+        }
+    }
+};
 
 
 #define MAX_DIMS 8
@@ -43,6 +52,8 @@ public:
     bool infer_on_image(const cv::Mat& input, cv::Mat& result, SAM3_VISUALIZATION vis_type);
     bool run_blind_inference();
     void pin_opencv_matrices(cv::Mat& input_mat, cv::Mat& result_mat);
+    std::pair<cv::Mat, std::shared_ptr<void>> allocate_pinned_mat(int rows, int cols, int type);
+    void setup_pinned_matrices(cv::Mat& input_mat, cv::Mat& result_mat);
     std::vector<void*> output_cpu;
 
 private:
