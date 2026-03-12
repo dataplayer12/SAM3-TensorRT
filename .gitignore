@@ -1,2 +1,6 @@
 *.DS_Store
 *build
+.results
+*.plan
+onnx_weights/
+test_images/

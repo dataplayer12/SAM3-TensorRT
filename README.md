@@ -112,11 +112,11 @@ docker run -it --rm \
 ```bash
 python python/onnxexport.py
 ```
-This produces `onnx_weights/sam3_static.onnx` plus external weight shards.
+This produces `onnx_weights/sam3_dynamic.onnx` plus external weight shards.
 
 5) Build a TensorRT engine
 ```bash
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose
+trtexec --onnx=onnx_weights/sam3_dynamic.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose
 ```
 
 6) Build the C++/CUDA library and sample app
@@ -182,3 +182,9 @@ If this saved you time, drop a ⭐ so others can find it and ship SAM-3 faster.
 
 # Disclaimer
 All views expressed here are my own. This project is not affiliated with my employer.
+
+cd /workspace/cpp/build
+make
+./sam3_pcs_app /workspace/test_images /workspace/sam3_fp16.plan 
+
+cd /workspace/cpp/build && make && ./sam3_pcs_app /workspace/test_images /workspace/sam3_fp16.plan 1

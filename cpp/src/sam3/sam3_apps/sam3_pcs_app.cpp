@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
     SAM3_PCS pcs(epath, vis_alpha, probability_threshold);
 
     cv::Mat img, result;
-    char* raw_bytes;
+    int prev_width = 0, prev_height = 0;
 
     std::filesystem::create_directories("results");
     int num_images_read=0;
@@ -111,24 +111,26 @@ int main(int argc, char* argv[])
         
     pcs.set_prompt(iid, iam);
 
+    const int MAX_BENCHMARK_IMAGES = 100;
+
     for (const auto& fname : std::filesystem::directory_iterator(in_dir))
     {
         if (std::filesystem::is_regular_file(fname.path())) 
         {
             std::filesystem::path outfile = std::filesystem::path("results") / fname.path().filename();
             
-            if (num_images_read==0)
+            img = cv::imread(fname.path(), cv::IMREAD_COLOR);
+            if (img.empty()) continue;
+
+            result.create(img.rows, img.cols, img.type());
+
+            if (img.cols != prev_width || img.rows != prev_height)
             {
-                cv::Mat tmp = cv::imread(fname.path(), cv::IMREAD_COLOR);
-                raw_bytes = (char *)malloc(tmp.total()*tmp.elemSize());
-                read_image_into_buffer(fname.path(), raw_bytes, img);
-                result = cv::imread(fname.path(), cv::IMREAD_COLOR);
                 pcs.pin_opencv_matrices(img, result);
+                prev_width = img.cols;
+                prev_height = img.rows;
             }
-            else
-            {
-                read_image_into_buffer(fname.path(), raw_bytes, img);
-            }
+
             start = std::chrono::system_clock::now();
             infer_one_image(pcs, img, result, visualize, outfile, benchmark);
             num_images_read++;
@@ -138,9 +140,20 @@ int main(int argc, char* argv[])
 
             if (num_images_read>0 && num_images_read%10==0)
             {
-                float msec_per_image = millis_elapsed/num_images_read;
-                printf("Processed %d images at %f msec/image\n", num_images_read, msec_per_image);
+                printf("Processed %d images...\n", num_images_read);
             }
+
+            if (num_images_read >= MAX_BENCHMARK_IMAGES) break;
         }
+    }
+
+    if (num_images_read > 0)
+    {
+        float msec_per_image = millis_elapsed/num_images_read;
+        float est_1000_min = msec_per_image * 1000.0f / 1000.0f / 60.0f;
+        printf("\n=== Benchmark Results ===\n");
+        printf("Processed %d images in %.1f s\n", num_images_read, millis_elapsed/1000.0f);
+        printf("Average: %.2f msec/image\n", msec_per_image);
+        printf("Estimated time for 1000 images: %.1f min\n", est_1000_min);
     }
 }
