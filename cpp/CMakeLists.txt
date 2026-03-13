@@ -30,6 +30,8 @@ include_directories(
     ${CUDNN_ROOT_DIR}/include
 )
 
+
+
 add_library(sam3_trt SHARED 
     src/sam3/sam3_trt/sam3.cu
     src/sam3/sam3_trt/prepost.cu

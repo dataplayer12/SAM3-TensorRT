@@ -183,8 +183,27 @@ If this saved you time, drop a ⭐ so others can find it and ship SAM-3 faster.
 # Disclaimer
 All views expressed here are my own. This project is not affiliated with my employer.
 
-cd /workspace/cpp/build
-make
-./sam3_pcs_app /workspace/test_images /workspace/sam3_fp16.plan 
+## Dynamic Bounding Box Detection (New!)
+The application has been extended to support **Native Bounding Box Detection** directly from the SAM3 model outputs, as well as **Dynamic Text Prompting** without hardcoded tokens.
 
-cd /workspace/cpp/build && make && ./sam3_pcs_app /workspace/test_images /workspace/sam3_fp16.plan 1
+### Setup Tokenizer
+Because the C++ application relies on HuggingFace tokenization, you first must export the tokenizer files:
+```bash
+python3 python/export_tokenizer.py
+```
+*This will create `tokenizer.json` in the `onnx_weights/` directory for the Python script to use.*
+
+### Run Bounding Box Visualization
+Run the application with your target prompt as the 3rd argument. The C++ application will dynamically tokenize the prompt, run the TensorRT engine, and draw green bounding boxes with the text label above them.
+```bash
+cd /workspace/cpp/build
+make -j
+./sam3_pcs_app /workspace/test_images /workspace/sam3_fp16.plan "helmet"
+```
+
+### Benchmark Bounding Box Inference
+To test the raw speed of the `.plan` engine executing the prompt and calculating bounding boxes (without the latency of OpenCV drawing and saving the images), append `1` to the end of the command:
+```bash
+cd /workspace/cpp/build
+./sam3_pcs_app /workspace/test_images /workspace/sam3_fp16.plan "helmet" 1
+```

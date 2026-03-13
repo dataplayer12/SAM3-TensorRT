@@ -15,7 +15,8 @@ typedef enum {
 typedef enum {
     VIS_NONE,
     VIS_SEMANTIC_SEGMENTATION,
-    VIS_INSTANCE_SEGMENTATION
+    VIS_INSTANCE_SEGMENTATION,
+    VIS_BBOX
 } SAM3_VISUALIZATION;
 
 typedef struct {

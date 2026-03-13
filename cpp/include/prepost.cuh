@@ -51,6 +51,20 @@ __global__ void draw_instance_seg_mask(
     float3* color_palette
 );
 
+__global__ void draw_bounding_box(
+    float* boxes,
+    float* logits,
+    uint8_t* result,
+    int src_width,
+    int src_height,
+    int src_channels,
+    int max_boxes,
+    int box_idx,
+    float prob_threshold,
+    float3* color_palette,
+    int thickness
+);
+
 static std::vector<float3> colpal = {
     make_float3(  0, 185, 118), // teal (your original)
     make_float3(230, 159,   0), // orange
