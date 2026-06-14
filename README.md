@@ -38,6 +38,7 @@ The numbers show end to end image processing latency per image (4K resolution) i
 | Jetson Thor |  |  |  | Please contribute |
 | DGX Spark |  |  |  | Please contribute |
 | RTX 3090 | 438 ms | 75 ms | 5.82x |  |
+| RTX 5090 | 120.9 ms | 24.8 ms | 4.88x | COCO val2017, TRT 10.14.1 |
 | A10 | 545.3 ms | 161.1 | 3.38x | GPU hits 100% utilization |
 | A100 | 314.1 ms | 48.8 ms | 6.43x | 40GB SXM4 variant |
 | H100 | 265.3 ms | 34.6 ms | 7.66x | PCIe variant |
@@ -112,11 +113,11 @@ docker run -it --rm \
 ```bash
 python python/onnxexport.py
 ```
-This produces `onnx_weights/sam3_static.onnx` plus external weight shards.
+This produces `onnx_weights/sam3_dynamic.onnx` plus external weight shards.
 
 5) Build a TensorRT engine
 ```bash
-trtexec --onnx=onnx_weights/sam3_static.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose
+trtexec --onnx=onnx_weights/sam3_dynamic.onnx --saveEngine=sam3_fp16.plan --fp16 --verbose
 ```
 
 6) Build the C++/CUDA library and sample app
