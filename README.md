@@ -35,7 +35,7 @@ The numbers show end to end image processing latency per image (4K resolution) i
 | Hardware | HF+PyTorch | TensorRT+CUDA | Speedup | Notes |
 | --- | --- | --- | --- | --- |
 | Jetson Orin NX | 6600 ms | 950 ms | 6.95x | Uses zero-copy |
-| Jetson Thor |  |  |  | Please contribute |
+| Jetson Thor | 1709.8 ms | 125.9 ms | 13.58x | R38.2.2, CUDA 13.0, TRT 10.13.3, MAXN, zero-copy, 10x 4K images |
 | DGX Spark |  |  |  | Please contribute |
 | RTX 3090 | 438 ms | 75 ms | 5.82x |  |
 | RTX 5090 | 120.9 ms | 24.8 ms | 4.88x | COCO val2017, TRT 10.14.1 |
