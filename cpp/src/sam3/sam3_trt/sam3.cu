@@ -1,5 +1,21 @@
 #include "sam3.cuh"
 
+static size_t datatype_size(nvinfer1::DataType dtype)
+{
+    switch (dtype)
+    {
+        case nvinfer1::DataType::kFLOAT:  return 4;
+        case nvinfer1::DataType::kHALF:   return 2;
+        case nvinfer1::DataType::kINT8:   return 1;
+        case nvinfer1::DataType::kINT32:  return 4;
+        case nvinfer1::DataType::kINT64:  return 8;
+        case nvinfer1::DataType::kBOOL:   return 1;
+        case nvinfer1::DataType::kBF16:   return 2;
+        case nvinfer1::DataType::kFP8:    return 1;
+        default:                          return 4;
+    }
+}
+
 SAM3_PCS::SAM3_PCS(const std::string engine_path, const float vis_alpha, const float prob_threshold)
     : _engine_path(engine_path)
     , _overlay_alpha(vis_alpha)
@@ -23,19 +39,24 @@ SAM3_PCS::SAM3_PCS(const std::string engine_path, const float vis_alpha, const f
 
 void SAM3_PCS::pin_opencv_matrices(cv::Mat& input_mat, cv::Mat& result_mat)
 {
+    // Free previous GPU buffers if re-allocating (image size changed)
+    if (!is_zerocopy && opencv_inbytes > 0)
+    {
+        if (opencv_input) { cudaFree(opencv_input); opencv_input = nullptr; }
+        if (gpu_result)   { cudaFree(gpu_result);   gpu_result = nullptr;   }
+    }
+
     opencv_inbytes = input_mat.total() * input_mat.elemSize();
 
-    cuda_check(cudaHostRegister(
+    if (is_zerocopy)
+    {
+        cuda_check(cudaHostRegister(
             input_mat.data,
             opencv_inbytes,
             cudaHostRegisterDefault),
             " pinning opencv input Mat on host"
         );
-    // for most purposes the default flag is good enough, in my benchmarking
-    // using others say readonly flag did not improve performance
 
-    if (is_zerocopy)
-    {
         cuda_check(cudaHostRegister(
             result_mat.data,
             opencv_inbytes,
@@ -53,7 +74,7 @@ void SAM3_PCS::pin_opencv_matrices(cv::Mat& input_mat, cv::Mat& result_mat)
     }
     else
     {
-        // on dGPU allocate additional memory for input
+        // on dGPU allocate GPU-side buffers for image data
         cuda_check(cudaMalloc(&opencv_input, opencv_inbytes), " allocating opencv input memory on a dGPU system");
         cuda_check(cudaMalloc((void**)&gpu_result, opencv_inbytes), " allocating result memory on a dGPU system");        
         cudaMemset(opencv_input, 0, opencv_inbytes);
@@ -124,11 +145,56 @@ void SAM3_PCS::visualize_on_dGPU(const cv::Mat& input, cv::Mat& result, SAM3_VIS
                 gpu_colpal);
         }
     }
+    else if (vis_type == SAM3_VISUALIZATION::VIS_BBOX)
+    {
+        // First copy the original image to the result
+        cuda_check(cudaMemcpyAsync((void *)gpu_result, 
+            (void *)input_ptr, 
+            opencv_inbytes, 
+            cudaMemcpyDeviceToDevice, 
+            sam3_stream), " async memcpy for result during bbox visualization");
+
+        dim3 bbsize(16, 16);
+        dim3 bgsize;
+        bgsize.x = (input.cols + bbsize.x - 1) / bbsize.x;
+        bgsize.y = (input.rows + bbsize.y - 1) / bbsize.y;
+
+        int num_boxes = 200; // SAM3 predicts 200 boxes max generally
+        
+        // Loop over all boxes and launch drawing kernel for each
+        for (int box_idx = 0; box_idx < num_boxes; box_idx++) {
+            draw_bounding_box<<<bgsize, bbsize, 0, sam3_stream>>>(
+                static_cast<float*>(output_gpu[2]), // pred_boxes
+                static_cast<float*>(output_gpu[3]), // pred_logits
+                gpu_result,
+                input.cols,
+                input.rows,
+                input.channels(),
+                num_boxes,
+                box_idx,
+                _probability_threshold,
+                gpu_colpal,
+                2); // thickness 2
+        }
+    }
 
     if (!is_zerocopy && vis_type == SAM3_VISUALIZATION::VIS_NONE)
     {
         cudaMemcpyAsync(output_cpu[0], output_gpu[0],output_sizes[0], cudaMemcpyDeviceToHost, sam3_stream);
         cudaMemcpyAsync(output_cpu[1], output_gpu[1],output_sizes[1], cudaMemcpyDeviceToHost, sam3_stream);
+    }
+    else if (!is_zerocopy && vis_type == SAM3_VISUALIZATION::VIS_BBOX)
+    {
+        // Copy the small tensor outputs (boxes and logits) to CPU for drawing text labels
+        cudaMemcpyAsync(output_cpu[2], output_gpu[2], output_sizes[2], cudaMemcpyDeviceToHost, sam3_stream);
+        cudaMemcpyAsync(output_cpu[3], output_gpu[3], output_sizes[3], cudaMemcpyDeviceToHost, sam3_stream);
+        
+        cudaMemcpyAsync(
+            (void*)result.data, 
+            (void*)gpu_result, 
+            opencv_inbytes, 
+            cudaMemcpyDeviceToHost, 
+            sam3_stream);
     }
     else if (!is_zerocopy)
     {
@@ -274,7 +340,7 @@ void SAM3_PCS::allocate_io_buffers()
         nvinfer1::TensorIOMode mode = trt_engine->getTensorIOMode(name);
 
         nvinfer1::Dims dims = trt_engine->getTensorShape(name);
-        size_t nbytes = sizeof(trt_engine->getTensorDataType(name));
+        size_t nbytes = datatype_size(trt_engine->getTensorDataType(name));
         
         for (int idx=0;idx < MAX_DIMS; idx++)
         {

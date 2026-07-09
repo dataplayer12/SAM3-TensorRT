@@ -175,3 +175,68 @@ __global__ void draw_instance_seg_mask(
         }
     }
 }
+
+__global__ void draw_bounding_box(
+    float* boxes,
+    float* logits,
+    uint8_t* result,
+    int src_width,
+    int src_height,
+    int src_channels,
+    int max_boxes,
+    int box_idx,
+    float prob_threshold,
+    float3* color_palette,
+    int thickness
+)
+{
+    // One thread per pixel in the image. Block size e.g., 16x16
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x >= src_width || y >= src_height) return;
+
+    // Check if the box is valid (prob > threshold)
+    // Logits: 1 / (1 + exp(-logit))
+    float logit = logits[box_idx];
+    float prob = 1.0f / (1.0f + exp(-logit));
+    if (prob <= prob_threshold) return;
+
+    // Get color from palette
+    float3 color = color_palette[box_idx % 20];
+
+    // Read box coords [x_min, y_min, x_max, y_max] normalized 0-1
+    float x1 = boxes[box_idx * 4 + 0];
+    float y1 = boxes[box_idx * 4 + 1];
+    float x2 = boxes[box_idx * 4 + 2];
+    float y2 = boxes[box_idx * 4 + 3];
+
+    // Convert to pixel coordinates
+    int x_min = max(0, (int)(x1 * src_width));
+    int y_min = max(0, (int)(y1 * src_height));
+    int x_max = min(src_width - 1, (int)(x2 * src_width));
+    int y_max = min(src_height - 1, (int)(y2 * src_height));
+
+    // Check if current thread pixel is ON the border of the bounding box
+    bool is_border = false;
+    
+    // Check horizontal borders (top and bottom)
+    if (x >= x_min && x <= x_max) {
+        if (abs(y - y_min) < thickness || abs(y - y_max) < thickness) {
+            is_border = true;
+        }
+    }
+    // Check vertical borders (left and right)
+    if (y >= y_min && y <= y_max) {
+        if (abs(x - x_min) < thickness || abs(x - x_max) < thickness) {
+            is_border = true;
+        }
+    }
+
+    if (is_border) {
+        int res_loc = (y * src_width + x) * src_channels;
+        result[res_loc] = (uint8_t)color.x;
+        result[res_loc + 1] = (uint8_t)color.y;
+        result[res_loc + 2] = (uint8_t)color.z;
+    }
+}

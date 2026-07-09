@@ -42,7 +42,7 @@ class Sam3ONNXWrapper(torch.nn.Module):
             input_ids=input_ids,
             attention_mask=attention_mask)
         
-        return outputs.pred_masks, outputs.semantic_seg
+        return outputs.pred_masks, outputs.semantic_seg, outputs.pred_boxes, outputs.pred_logits
 
 wrapper = Sam3ONNXWrapper(model).to(device).eval()
 
@@ -56,7 +56,7 @@ torch.onnx.export(
     (pixel_values, input_ids, attention_mask),
     onnx_path,
     input_names=["pixel_values", "input_ids", "attention_mask"],
-    output_names=["instance_masks", "semantic_seg"],
+    output_names=["instance_masks", "semantic_seg", "pred_boxes", "pred_logits"],
     dynamo=False,
     opset_version=17,
 )

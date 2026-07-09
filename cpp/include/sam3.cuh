@@ -52,7 +52,7 @@ private:
     cudaStream_t sam3_stream;
     dim3 bsize;
     dim3 gsize;
-    int in_width, in_height, opencv_inbytes;
+    int in_width, in_height, opencv_inbytes = 0;
 
     std::vector<void*> input_cpu;
     std::vector<void*> input_gpu;
